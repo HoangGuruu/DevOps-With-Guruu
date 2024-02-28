@@ -1,0 +1,59 @@
+pipeline {
+  agent any
+  
+  stages {
+    stage('Build-Docker-Image') {
+      steps {
+        sh "docker version"
+        sh "docker build -t hoangguruu/myapp-private:${env.BUILD_NUMBER} ."
+      }
+    }
+    stage('Login-Into-Docker') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'docker-cred', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) { 
+              sh "docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD"
+            }
+    }
+    }
+    stage('Push-Images-Docker-to-DockerHub') {
+      steps {
+        
+        sh "docker push hoangguruu/myapp-private:${env.BUILD_NUMBER}"
+        
+      }
+    }
+    stage('Update GIT') {
+      steps {
+        script {
+          catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+            withCredentials([usernamePassword(credentialsId: 'github-cred', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME')]) {
+              //def encodedPassword = URLEncoder.encode("$GIT_PASSWORD",'UTF-8')
+              sh "git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${GIT_USERNAME}/deploy.git"
+              dir('deploy') {
+                sh "ls"
+                sh "git config user.email nthoangthcs@gmail.com"
+                sh "git config user.name HoangGuruu"
+                sh "cat deployment.yaml"
+                sh "sed -i 's+hoangguruu/myapp-private.*+hoangguruu/myapp-private:${env.BUILD_NUMBER}+g' deployment.yaml"
+                sh "cat deployment.yaml"
+                sh "git add ."
+                sh "git commit -m 'Done by Jenkins Job changemanifest: ${env.BUILD_NUMBER}'"
+                sh "git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${GIT_USERNAME}/deploy.git HEAD:main"
+              }
+            }
+          }
+        }
+      }
+    }
+
+  }
+  
+  post {
+    always {
+      
+      sh 'docker logout'
+      sh 'rm -rf deploy'
+      
+    }
+  }
+}
