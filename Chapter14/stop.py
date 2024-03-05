@@ -5,7 +5,7 @@ import urllib3
 
 ec2_resource = boto3.resource('ec2')
 http = urllib3.PoolManager()
-webhook_url = "https://hooks.slack.com/services/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"
+webhook_url = ""
 
 def lambda_handler(event, context):
     environment_auto= os.environ.get('environment_auto')
